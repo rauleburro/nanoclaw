@@ -2,7 +2,7 @@
 
 ## Structure
 
-**`nanocoai/nanoclaw`** (upstream) — core engine with skill definitions (`.claude/skills/`). No channel code on `main`.
+**`nanocoai/nanoclaw`** (upstream) — core engine with development skill definitions (`agent-skills/`, exposed to `.claude/skills` and `.agents/skills` by symlink). No channel code on `main`.
 
 **Channel forks** (`nanoclaw-whatsapp`, `nanoclaw-telegram`, `nanoclaw-slack`, etc.) — each fork = upstream + one channel's code applied. Users clone upstream, then merge a fork into their clone to add a channel.
 

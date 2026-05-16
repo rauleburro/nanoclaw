@@ -1,0 +1,5 @@
+# Repo-local Codex configuration.
+#
+# Keep this file free of secrets and user-local authentication. Project guidance
+# lives in ../AGENTS.md. Development-agent skills are exposed through
+# ../.agents/skills, which points at ../agent-skills.

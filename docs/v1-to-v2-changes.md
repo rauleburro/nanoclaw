@@ -167,6 +167,6 @@ Lockfiles: host uses `pnpm-lock.yaml`, agent-runner uses `bun.lock`. `minimumRel
 - `setup/migrate-v2/shared.ts` — JID parsing, trigger mapping, channel auth registry.
 - `logs/setup-migration/handoff.json` — written by `migrate-v2.sh`, read by the `/migrate-from-v1` skill.
 - `logs/migrate-steps/*.log` — raw per-step stdout.
-- `.claude/skills/migrate-from-v1/SKILL.md` — Claude skill for owner seeding, CLAUDE.md cleanup, container config validation, fork porting.
+- `agent-skills/migrate-from-v1/SKILL.md` — Claude skill for owner seeding, CLAUDE.md cleanup, container config validation, fork porting.
 - `migrate-v2-reset.sh` — development helper to wipe v2 state for re-testing.
 - See [docs/migration-dev.md](migration-dev.md) for the full development guide.

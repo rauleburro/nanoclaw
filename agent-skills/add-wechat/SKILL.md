@@ -121,7 +121,7 @@ Have a different WeChat account send a message to the bot account. This auto-cre
 ### 2. Run the wire script
 
 ```bash
-pnpm exec tsx .claude/skills/add-wechat/scripts/wire-dm.ts
+pnpm exec tsx agent-skills/add-wechat/scripts/wire-dm.ts
 ```
 
 Interactive flow: the script lists all unwired WeChat messaging groups, asks which agent group to wire it to, and creates the `messaging_group_agents` row with sensible defaults (sender policy `request_approval`, session mode `shared`).
@@ -131,7 +131,7 @@ With `request_approval`, the next DM from the stranger fires an approval card to
 Non-interactive:
 
 ```bash
-pnpm exec tsx .claude/skills/add-wechat/scripts/wire-dm.ts \
+pnpm exec tsx agent-skills/add-wechat/scripts/wire-dm.ts \
   --platform-id wechat:wxid_xxxxx \
   --agent-group ag-xxxxx \
   --non-interactive

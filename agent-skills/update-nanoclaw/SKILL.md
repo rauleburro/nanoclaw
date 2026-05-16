@@ -16,7 +16,7 @@ Run `/update-nanoclaw` in Claude Code.
 **Backup**: creates a timestamped backup branch and tag (`backup/pre-update-<hash>-<timestamp>`, `pre-update-<hash>-<timestamp>`) before touching anything. Safe to run multiple times.
 
 **Preview**: runs `git log` and `git diff` against the merge base to show upstream changes since your last sync. Groups changed files into categories:
-- **Skills** (`.claude/skills/`): unlikely to conflict unless you edited an upstream skill
+- **Skills** (`agent-skills/`): unlikely to conflict unless you edited an upstream skill
 - **Host source** (`src/`): may conflict if you modified the same files
 - **Container** (`container/`): triggers container rebuild
 - **Build/config** (`package.json`, `pnpm-lock.yaml`, `tsconfig*.json`): lockfile changes trigger dep install
@@ -108,7 +108,7 @@ Show file-level impact from upstream:
 - `git diff --name-only $BASE..upstream/$UPSTREAM_BRANCH`
 
 Bucket the upstream changed files:
-- **Skills** (`.claude/skills/`): unlikely to conflict unless the user edited an upstream skill
+- **Skills** (`agent-skills/`): unlikely to conflict unless the user edited an upstream skill
 - **Host source** (`src/`): may conflict if user modified the same files
 - **Container** (`container/`): triggers container rebuild (+ typecheck if `agent-runner/src/` changed)
 - **Build/config** (`package.json`, `pnpm-lock.yaml`, `tsconfig*.json`): lockfile changes trigger dep install
@@ -278,5 +278,5 @@ Tell the user:
 
 ## Diagnostics
 
-1. Use the Read tool to read `.claude/skills/update-nanoclaw/diagnostics.md`.
+1. Use the Read tool to read `agent-skills/update-nanoclaw/diagnostics.md`.
 2. Follow every step in that file before finishing.

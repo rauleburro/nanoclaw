@@ -23,7 +23,7 @@ Record the choice as `CHANNEL` (lowercase, e.g. `discord`).
 
 ## 2. Ask for the operator's identity
 
-Read the channel's own skill for its `## Channel Info > how-to-find-id` section (e.g. `.claude/skills/add-discord/SKILL.md`, `.claude/skills/add-telegram/SKILL.md`). Show those instructions to the user in plain text.
+Read the channel's own skill for its `## Channel Info > how-to-find-id` section (e.g. `agent-skills/add-discord/SKILL.md`, `agent-skills/add-telegram/SKILL.md`). Show those instructions to the user in plain text.
 
 Then ask in plain text (NOT `AskUserQuestion` — these are free-form):
 

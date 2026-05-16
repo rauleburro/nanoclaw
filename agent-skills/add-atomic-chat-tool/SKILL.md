@@ -42,7 +42,7 @@ If the request fails:
 ### Copy the MCP server source
 
 ```bash
-cp .claude/skills/add-atomic-chat-tool/atomic-chat-mcp-stdio.ts container/agent-runner/src/atomic-chat-mcp-stdio.ts
+cp agent-skills/add-atomic-chat-tool/atomic-chat-mcp-stdio.ts container/agent-runner/src/atomic-chat-mcp-stdio.ts
 ```
 
 ### Register the MCP server in the agent-runner
@@ -143,7 +143,7 @@ Replace it with:
 Append to `.env.example`:
 
 ```bash
-# Atomic Chat MCP tool (.claude/skills/add-atomic-chat-tool)
+# Atomic Chat MCP tool (agent-skills/add-atomic-chat-tool)
 # Override the host where Atomic Chat exposes its OpenAI-compatible API.
 # Default: http://host.docker.internal:1337 (with fallback to localhost)
 # ATOMIC_CHAT_HOST=http://host.docker.internal:1337

@@ -43,6 +43,6 @@ rm /tmp/nanoclaw-diagnostics.json
 **No**: `rm /tmp/nanoclaw-diagnostics.json`
 
 **Never ask again**:
-1. Replace contents of `.claude/skills/update-nanoclaw/diagnostics.md` with `# Diagnostics — opted out`
-2. Remove the `## Diagnostics` section from `.claude/skills/update-nanoclaw/SKILL.md`
+1. Replace contents of `agent-skills/update-nanoclaw/diagnostics.md` with `# Diagnostics — opted out`
+2. Remove the `## Diagnostics` section from `agent-skills/update-nanoclaw/SKILL.md`
 3. `rm /tmp/nanoclaw-diagnostics.json`

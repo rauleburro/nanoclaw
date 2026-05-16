@@ -194,7 +194,7 @@ function buildSystemPrompt(ctx: HandoffContext): string {
     ...(ctx.files ?? []),
     'logs/setup.log',
     'logs/setup-steps/',
-    `.claude/skills/add-${ctx.channel}/SKILL.md`,
+    `agent-skills/add-${ctx.channel}/SKILL.md`,
     `setup/channels/${ctx.channel}.ts`,
   ].filter((v, i, a) => a.indexOf(v) === i);
 

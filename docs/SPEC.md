@@ -225,7 +225,7 @@ Channels self-register using a barrel-import pattern:
 
 ### Adding a New Channel
 
-To add a new channel, contribute a skill to `.claude/skills/add-<name>/` that:
+To add a new channel, contribute a skill to `agent-skills/add-<name>/` that:
 
 1. Adds a `src/channels/<name>.ts` file implementing the `Channel` interface
 2. Calls `registerChannel(name, factory)` at module load
@@ -240,7 +240,8 @@ See existing skills (`/add-whatsapp`, `/add-telegram`, `/add-slack`, `/add-disco
 
 ```
 nanoclaw/
-├── CLAUDE.md                      # Project context for Claude Code
+├── AGENTS.md                      # Canonical project context for coding agents
+├── CLAUDE.md                      # Claude Code compatibility shim
 ├── docs/
 │   ├── SPEC.md                    # This specification document
 │   ├── REQUIREMENTS.md            # Architecture decisions
@@ -282,17 +283,21 @@ nanoclaw/
 │
 ├── dist/                          # Compiled JavaScript (gitignored)
 │
+├── agent-skills/
+│   ├── setup/SKILL.md              # /setup - First-time installation
+│   ├── customize/SKILL.md          # /customize - Add capabilities
+│   ├── debug/SKILL.md              # /debug - Container debugging
+│   ├── add-telegram/SKILL.md       # /add-telegram - Telegram channel
+│   ├── add-gmail/SKILL.md          # /add-gmail - Gmail integration
+│   ├── add-voice-transcription/    # /add-voice-transcription - Whisper
+│   ├── x-integration/SKILL.md      # /x-integration - X/Twitter
+│   ├── convert-to-apple-container/ # /convert-to-apple-container - Apple Container runtime
+│   └── add-parallel/SKILL.md       # /add-parallel - Parallel agents
+│
 ├── .claude/
-│   └── skills/
-│       ├── setup/SKILL.md              # /setup - First-time installation
-│       ├── customize/SKILL.md          # /customize - Add capabilities
-│       ├── debug/SKILL.md              # /debug - Container debugging
-│       ├── add-telegram/SKILL.md       # /add-telegram - Telegram channel
-│       ├── add-gmail/SKILL.md          # /add-gmail - Gmail integration
-│       ├── add-voice-transcription/    # /add-voice-transcription - Whisper
-│       ├── x-integration/SKILL.md      # /x-integration - X/Twitter
-│       ├── convert-to-apple-container/  # /convert-to-apple-container - Apple Container runtime
-│       └── add-parallel/SKILL.md       # /add-parallel - Parallel agents
+│   └── skills -> ../agent-skills   # Claude Code compatibility
+├── .agents/
+│   └── skills -> ../agent-skills   # Codex skill discovery
 │
 ├── groups/
 │   ├── CLAUDE.md                  # Global memory (all groups read this)

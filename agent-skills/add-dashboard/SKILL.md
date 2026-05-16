@@ -33,7 +33,7 @@ pnpm install @nanoco/nanoclaw-dashboard
 Copy the resource file into src:
 
 ```
-.claude/skills/add-dashboard/resources/dashboard-pusher.ts → src/dashboard-pusher.ts
+agent-skills/add-dashboard/resources/dashboard-pusher.ts → src/dashboard-pusher.ts
 ```
 
 ### 3. Add exports to src/db/index.ts

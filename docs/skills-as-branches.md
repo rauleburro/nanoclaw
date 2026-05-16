@@ -8,16 +8,16 @@ NanoClaw has four types of skills overall. See [CONTRIBUTING.md](../CONTRIBUTING
 
 | Type | Location | How it works |
 |------|----------|-------------|
-| **Feature** (this doc) | `.claude/skills/` + `skill/*` branch | SKILL.md has instructions; code lives on a branch, applied via `git merge` |
-| **Utility** | `.claude/skills/<name>/` with code files | Self-contained tools; code in skill directory, copied into place on install |
-| **Operational** | `.claude/skills/` on `main` | Instruction-only workflows (setup, debug, update) |
+| **Feature** (this doc) | `agent-skills/` + `skill/*` branch | SKILL.md has instructions; code lives on a branch, applied via `git merge` |
+| **Utility** | `agent-skills/<name>/` with code files | Self-contained tools; code in skill directory, copied into place on install |
+| **Operational** | `agent-skills/` on `main` | Instruction-only workflows (setup, debug, update) |
 | **Container** | `container/skills/` | Loaded inside agent containers at runtime |
 
 ---
 
 Feature skills are distributed as git branches on the upstream repository. Applying a skill is a `git merge`. Updating core is a `git merge`. Everything is standard git.
 
-This replaces the previous `skills-engine/` system (three-way file merging, `.nanoclaw/` state, manifest files, replay, backup/restore) with plain git operations and Claude for conflict resolution.
+This replaces the previous `skills-engine/` system (three-way file merging, `.nanoclaw/` state, manifest files, replay, backup/restore) with plain git operations and a coding agent for conflict resolution.
 
 ## How It Works
 
@@ -41,7 +41,7 @@ Skills are split into two categories:
 **Operational skills** (on `main`, always available):
 - `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`
 - These are instruction-only SKILL.md files — no code changes, just workflows
-- Live in `.claude/skills/` on `main`, immediately available to every user
+- Live in `agent-skills/` on `main`, immediately available to every user through agent-specific discovery symlinks
 
 **Feature skills** (in marketplace, installed on demand):
 - `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
@@ -323,7 +323,7 @@ Standard fork contribution workflow. Their custom changes stay on their main and
 
 ## Contributing a Skill
 
-The flow below is for **feature skills** (branch-based). For utility skills (self-contained tools) and container skills, the contributor opens a PR that adds files directly to `.claude/skills/<name>/` or `container/skills/<name>/` — no branch extraction needed. See [CONTRIBUTING.md](../CONTRIBUTING.md) for all skill types.
+The flow below is for **feature skills** (branch-based). For utility skills (self-contained tools) and container skills, the contributor opens a PR that adds files directly to `agent-skills/<name>/` or `container/skills/<name>/` — no branch extraction needed. See [CONTRIBUTING.md](../CONTRIBUTING.md) for all skill types.
 
 ### Contributor flow (feature skills)
 
@@ -530,7 +530,7 @@ Migration from the old skills engine to branches is complete. All feature skills
 - All `add/`, `modify/`, `tests/`, and `manifest.yaml` from skill directories
 - `.nanoclaw/` state directory
 
-Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-skills`) remain on main in `.claude/skills/`.
+Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-skills`) remain on main in `agent-skills/`.
 
 ## What Changes
 
@@ -582,7 +582,7 @@ Marketplace configuration so the official marketplace is auto-registered:
 
 ### Skills directory on main
 
-The `.claude/skills/` directory on `main` retains only operational skills (setup, debug, update-nanoclaw, customize, update-skills). Feature skills (add-discord, add-telegram, etc.) live in the marketplace repo, installed via `claude plugin install` during `/setup` or `/customize`.
+The `agent-skills/` directory on `main` retains only operational skills (setup, debug, update-nanoclaw, customize, update-skills). Feature skills (add-discord, add-telegram, etc.) live in the marketplace repo, installed via `claude plugin install` during `/setup` or `/customize`.
 
 ### Skills engine removal
 
@@ -595,9 +595,9 @@ The following can be removed:
 - `scripts/validate-all-skills.ts`
 - `.nanoclaw/` — state directory
 - `add/` and `modify/` subdirectories from all skill directories
-- Feature skill SKILL.md files from `.claude/skills/` on main (they now live in the marketplace)
+- Feature skill SKILL.md files from `agent-skills/` on main (they now live in the marketplace)
 
-Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-skills`) remain on main in `.claude/skills/`.
+Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-skills`) remain on main in `agent-skills/`.
 
 ### New infrastructure
 

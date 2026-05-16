@@ -32,7 +32,7 @@ setup/migrate-v2/
   select-channels.ts                 # Phase 2a: clack multiselect
   switchover-prompt.ts               # Service switch prompts
 setup/migrate-v2/shared.ts           # Shared helpers (JID parsing, trigger mapping, etc.)
-.claude/skills/migrate-from-v1/      # The Claude skill
+agent-skills/migrate-from-v1/      # The Claude skill
 logs/setup-migration/handoff.json    # Written by migrate-v2.sh, read by skill
 logs/migrate-steps/*.log             # Per-step raw output
 ```

@@ -114,7 +114,7 @@ Spawn a haiku sub-agent (Agent tool, model: haiku) for initial exploration:
 > 1. `git diff --name-only $BASE..HEAD` — all changed files
 > 2. `git log --oneline $BASE..HEAD` — all commits (look for skill branch merges like `Merge branch 'skill/*'`)
 > 3. `git branch -r --list 'upstream/skill/*'` — available upstream skill branches
-> 4. `ls .claude/skills/` — installed skills
+> 4. `ls agent-skills/` — installed skills
 > 5. For each skill merge found, record the merge commit hash
 >
 > Report: (a) list of applied skills with their merge commit hashes, (b) list of all changed files, (c) any custom skill directories that don't match upstream branches.
@@ -212,7 +212,7 @@ List each skill with its branch name. These are reapplied by merging the upstrea
 - `add-telegram` — branch `skill/telegram`
 - `add-voice-transcription` — branch `skill/voice-transcription`
 
-Custom skills (user-created, not from upstream): `.claude/skills/my-custom-skill/` — copy as-is from main tree.
+Custom skills (user-created, not from upstream): `agent-skills/my-custom-skill/` — copy as-is from main tree.
 
 ## Skill Interactions
 
@@ -480,5 +480,5 @@ Offer to pop the stash if one was created in preflight: `git stash pop`
 
 ## Diagnostics
 
-1. Use the Read tool to read `.claude/skills/migrate-nanoclaw/diagnostics.md`.
+1. Use the Read tool to read `agent-skills/migrate-nanoclaw/diagnostics.md`.
 2. Follow every step in that file before finishing.

@@ -10,7 +10,7 @@
  * otherwise requires manual SQL for.
  *
  * Usage:
- *   pnpm exec tsx .claude/skills/add-wechat/scripts/wire-dm.ts
+ *   pnpm exec tsx agent-skills/add-wechat/scripts/wire-dm.ts
  *
  * Flags:
  *   --platform-id <id>      Wire a specific messaging group (default: most recent unwired)
@@ -61,7 +61,7 @@ function parseArgs(argv: string[]): Args {
         args.sessionMode = val; i++; break;
       case '--non-interactive': args.interactive = false; break;
       case '--help': case '-h':
-        console.log('See .claude/skills/add-wechat/scripts/wire-dm.ts header for usage.');
+        console.log('See agent-skills/add-wechat/scripts/wire-dm.ts header for usage.');
         process.exit(0);
     }
   }
