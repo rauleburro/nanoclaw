@@ -31,15 +31,16 @@ flowchart TB
   subgraph Session["Per-Session Container (Docker / Apple Container)"]
     direction TB
     PollLoop["Poll Loop<br/>(container/agent-runner)"]
-    Provider["Agent providers<br/>(claude, opencode, mock; todo: codex)"]
+    Provider["Agent providers<br/>(claude, codex, mock;<br/>opencode when installed)"]
     MCP["MCP Tools<br/>send_message, send_file, edit_message,<br/>add_reaction, send_card, ask_user_question,<br/>schedule_task, create_agent,<br/>install_packages, add_mcp_server"]
     Skills["Container Skills<br/>(container/skills/)"]
-    InDB[("inbound.db<br/>host writes<br/>even seq<br/>messages_in<br/>destinations<br/>processing_ack")]
-    OutDB[("outbound.db<br/>container writes<br/>odd seq<br/>messages_out<br/>heartbeat file")]
+    InDB[("inbound.db<br/>host writes<br/>messages_in<br/>delivered<br/>destinations<br/>session_routing")]
+    OutDB[("outbound.db<br/>container writes<br/>messages_out<br/>processing_ack<br/>session_state<br/>container_state")]
+    Heartbeat[".heartbeat<br/>container touches<br/>host stat mtime"]
   end
 
   subgraph Groups["Agent Group Filesystem (groups/*)"]
-    Folder["CLAUDE.md<br/>memory<br/>per-group skills<br/>container_config"]
+    Folder["CLAUDE.md<br/>memory<br/>per-group skills<br/>container.json"]
   end
 
   P1 & P2 & P3 & P4 & P5 --> Bridge
@@ -55,12 +56,14 @@ flowchart TB
   Provider --> MCP
   Provider --> Skills
   MCP --> OutDB
+  PollLoop --> Heartbeat
   OutDB --> Delivery
   Delivery --> Central
   Delivery --> Bridge
   Bridge --> P1 & P2 & P3 & P4 & P5
   Sweep --> InDB
   Sweep --> OutDB
+  Sweep --> Heartbeat
   Sweep --> Central
   Runner -.mounts.-> Folder
   MCP -.approval.-> Approvals
@@ -105,9 +108,9 @@ flowchart LR
   end
 
   subgraph Dests["inbound.db.destinations (per agent)"]
-    D1["slack -> messaging_group 42"]
-    D2["browser-agent -> agent_group 7<br/>(bidirectional row)"]
-    D3["github -> messaging_group 13"]
+    D1["slack -> messaging_group mg-slack-main"]
+    D2["browser-agent -> agent_group ag-browser<br/>(bidirectional row)"]
+    D3["github -> messaging_group mg-github-pr"]
   end
 
   subgraph AgentB["Agent Group B (browser sub-agent)"]
@@ -133,17 +136,27 @@ erDiagram
   agent_groups ||--o{ sessions : runs
   messaging_groups ||--o{ sessions : context
   agent_groups ||--o{ agent_destinations : owns
+  agent_groups ||--|| container_configs : config
   agent_groups ||--o{ pending_approvals : requests
 
   agent_groups {
-    int id
+    string id
     string name
     string folder
     string agent_provider
-    json container_config
+  }
+  container_configs {
+    string agent_group_id PK
+    string provider
+    string model
+    string effort
+    string image_tag
+    json skills
+    json mcp_servers
+    json additional_mounts
   }
   messaging_groups {
-    int id
+    string id
     string channel_type
     string platform_id
     string name
@@ -170,18 +183,25 @@ erDiagram
     string messaging_group_id FK
   }
   messaging_group_agents {
-    int messaging_group_id
-    int agent_group_id
+    string id
+    string messaging_group_id
+    string agent_group_id
     string session_mode "agent-shared | shared | per-thread"
-    json trigger_rules
+    string engage_mode "pattern | mention | mention-sticky"
+    string engage_pattern
+    string sender_scope "all | known"
+    string ignored_message_policy
     int priority
   }
   sessions {
-    int id
-    int agent_group_id
-    int messaging_group_id
-    string sdk_session_id
+    string id
+    string agent_group_id
+    string messaging_group_id
+    string thread_id
+    string agent_provider
     string status
+    string container_status
+    string last_active
   }
 ```
 
@@ -209,7 +229,7 @@ flowchart LR
   Container -->|"writes only<br/>(odd seq)"| Out
   Container -->|touch every poll| HB
   HostSweep[Host sweep] -->|stat mtime| HB
-  HostSweep -->|reads processing_ack| In
+  HostSweep -->|reads processing_ack + container_state| Out
 
-  note1["Each file has exactly ONE writer.<br/>Eliminates SQLite cross-process write contention.<br/>Collision-free seq numbering."]
+  note1["Each DB has a clear write owner.<br/>Host owns inbound messages_in status.<br/>Container writes lifecycle claims to outbound processing_ack."]
 ```

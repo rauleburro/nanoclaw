@@ -146,8 +146,16 @@ INSERT INTO messaging_groups (id, channel_type, platform_id, name, is_group, unk
 VALUES ('mg-linear-eng', 'linear', 'linear:ENG', 'Engineering', 1, 'public', datetime('now'));
 
 -- Wire to agent group
-INSERT INTO messaging_group_agents (id, messaging_group_id, agent_group_id, trigger_rules, response_scope, session_mode, priority, created_at)
-VALUES ('mga-linear-eng', 'mg-linear-eng', '<your-agent-group-id>', '', 'all', 'per-thread', 10, datetime('now'));
+INSERT INTO messaging_group_agents (
+  id, messaging_group_id, agent_group_id,
+  engage_mode, engage_pattern, sender_scope, ignored_message_policy,
+  session_mode, priority, created_at
+)
+VALUES (
+  'mga-linear-eng', 'mg-linear-eng', '<your-agent-group-id>',
+  'pattern', '.', 'all', 'drop',
+  'per-thread', 10, datetime('now')
+);
 ```
 
 The `platform_id` must be `linear:<TEAM_KEY>` matching the `LINEAR_TEAM_KEY` env var. Use `per-thread` session mode so each issue comment thread gets its own agent session.

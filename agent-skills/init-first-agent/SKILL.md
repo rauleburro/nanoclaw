@@ -57,7 +57,7 @@ Wait for the user's confirmation. Then look up the most recent DM messaging grou
 pnpm exec tsx scripts/q.ts data/v2.db "SELECT id, platform_id, name, created_at FROM messaging_groups WHERE channel_type='${CHANNEL}' AND is_group=0 ORDER BY created_at DESC LIMIT 5"
 ```
 
-Show the top rows to the user and confirm which `platform_id` is theirs (usually the most recent). Record as `PLATFORM_ID`. If none appeared, check `logs/nanoclaw.log` for `unknown_sender` drops — the adapter might be rejecting inbound due to connection or permission issues.
+Show the top rows to the user and confirm which `platform_id` is theirs (usually the most recent). Record as `PLATFORM_ID`. If none appeared, verify that the adapter received the DM and treated it as a direct/addressed message. Check `logs/nanoclaw.log` for inbound DM traces, adapter auth/gateway errors, dropped-message records, or channel-registration/approval logs.
 
 ### 3b. Telegram pair-code path (if the user prefers not to DM first)
 
@@ -87,7 +87,7 @@ The script:
 2. Creates the `agent_groups` row and calls `initGroupFilesystem` at `groups/dm-with-<name>/`.
 3. Reuses or creates the DM `messaging_groups` row.
 4. Wires them via `messaging_group_agents` (which auto-creates the companion `agent_destinations` row).
-5. Hands the welcome message to the running service via its CLI socket (`data/cli.sock`), targeting the DM messaging group. The service routes it into the DM session, which wakes the container synchronously. If the socket isn't reachable (service down), falls back to a direct `inbound.db` write that the next host sweep picks up.
+5. Hands the welcome message to the running service via its CLI socket (`data/cli.sock`), targeting the DM messaging group. The service routes it into the DM session, which wakes the container synchronously. If the socket isn't reachable, the script fails loudly; start/restart the NanoClaw service and rerun the command.
 
 Show the script's output to the user.
 
@@ -103,15 +103,15 @@ Wait for the user's reply. If they confirm receipt, the skill is done.
 
 If they say it didn't arrive, then diagnose using the DB directly (no waiting loops required — the message either delivered or it didn't):
 
-- `pnpm exec tsx scripts/q.ts data/v2-sessions/<agent-group-id>/sessions/<session-id>/outbound.db "SELECT id, status, created_at FROM messages_out ORDER BY created_at DESC LIMIT 5"` — check for stuck `pending` rows. Replace `<agent-group-id>` and `<session-id>` with the values from the script's output.
+- `pnpm exec tsx scripts/q.ts data/v2-sessions/<agent-group-id>/<session-id>/outbound.db "SELECT id, status, created_at FROM messages_out ORDER BY created_at DESC LIMIT 5"` — check for stuck `pending` rows. Replace `<agent-group-id>` and `<session-id>` with the values from the script's output.
 - `grep -E 'Unauthorized channel destination|container.*exited|error' logs/nanoclaw.log | tail -20` — look for ACL rejections or container crashes.
-- `ls data/v2-sessions/<agent-group-id>/sessions/*/outbound.db` — confirm the session exists.
+- `ls data/v2-sessions/<agent-group-id>/*/outbound.db` — confirm the session exists.
 
 ## Troubleshooting
 
 **"Missing required args"** — the script wants `--channel`, `--user-id`, `--platform-id`, `--display-name` at minimum. Re-check the command you assembled.
 
-**No `messaging_groups` row appears after the user DMs (step 3a)** — the router silently drops messages from unknown senders under `strict` policy but still creates the `messaging_groups` row. If the row is missing entirely, the adapter isn't receiving the inbound message. Check `logs/nanoclaw.log` for adapter errors (auth, gateway disconnect, rate limit).
+**No `messaging_groups` row appears after the user DMs (step 3a)** — verify that the adapter received the DM and marked it as a direct/addressed event. Check `logs/nanoclaw.log` for inbound DM traces, adapter errors (auth, gateway disconnect, rate limit), dropped-message records, or channel-registration/approval logs.
 
 **Owner already exists** — `hasAnyOwner()` returned true, so the grant is skipped silently. That's fine; the script still creates the agent and wiring. Reassigning ownership needs a separate flow (not this skill).
 

@@ -108,8 +108,16 @@ INSERT INTO messaging_groups (id, channel_type, platform_id, name, is_group, unk
 VALUES ('mg-github-myrepo', 'github', 'github:owner/repo', 'owner/repo', 1, '<policy>', datetime('now'));
 
 -- Wire to agent group
-INSERT INTO messaging_group_agents (id, messaging_group_id, agent_group_id, trigger_rules, response_scope, session_mode, priority, created_at)
-VALUES ('mga-github-myrepo', 'mg-github-myrepo', '<your-agent-group-id>', '', 'all', 'per-thread', 10, datetime('now'));
+INSERT INTO messaging_group_agents (
+  id, messaging_group_id, agent_group_id,
+  engage_mode, engage_pattern, sender_scope, ignored_message_policy,
+  session_mode, priority, created_at
+)
+VALUES (
+  'mga-github-myrepo', 'mg-github-myrepo', '<your-agent-group-id>',
+  'pattern', '.', 'all', 'drop',
+  'per-thread', 10, datetime('now')
+);
 ```
 
 Replace `<policy>` with `public` or `strict` based on the user's choice above.
