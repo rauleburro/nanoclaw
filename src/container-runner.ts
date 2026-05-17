@@ -22,13 +22,7 @@ import {
 import { materializeContainerJson } from './container-config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
-import {
-  CONTAINER_HOST_GATEWAY,
-  CONTAINER_RUNTIME_BIN,
-  hostGatewayArgs,
-  readonlyMountArgs,
-  stopContainer,
-} from './container-runtime.js';
+import { CONTAINER_RUNTIME_BIN, hostGatewayArgs, readonlyMountArgs, stopContainer } from './container-runtime.js';
 import { composeGroupClaudeMd } from './claude-md-compose.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
@@ -138,9 +132,7 @@ async function spawnContainer(session: Session): Promise<void> {
   const { provider, contribution } = resolveProviderContribution(session, agentGroup, containerConfig);
 
   const mounts = buildMounts(agentGroup, session, containerConfig, contribution);
-  const safeFolder = agentGroup.folder.replace(/[^a-zA-Z0-9_.-]/g, '-');
-  const installSlug = CONTAINER_INSTALL_LABEL.replace(/^nanoclaw-install=/, '');
-  const containerName = `nanoclaw-${installSlug}-${safeFolder}-${Date.now()}`;
+  const containerName = `nanoclaw-v2-${agentGroup.folder}-${Date.now()}`;
   // OneCLI agent identifier is always the agent group id — stable across
   // sessions and reversible via getAgentGroup() for approval routing.
   const agentIdentifier = agentGroup.id;
@@ -278,10 +270,24 @@ function buildMounts(
   // Agent group folder at /workspace/agent (RW for working files + CLAUDE.local.md)
   mounts.push({ hostPath: groupDir, containerPath: '/workspace/agent', readonly: false });
 
-  // Apple Container only supports directory bind mounts. container.json and
-  // composed CLAUDE.md are still materialized into the RW group directory;
-  // the host regenerates them on every spawn rather than overlaying them as
-  // nested read-only file mounts.
+  // container.json — nested RO mount on top of RW group dir so the agent
+  // can read its config but cannot modify it.
+  const containerJsonPath = path.join(groupDir, 'container.json');
+  if (fs.existsSync(containerJsonPath)) {
+    mounts.push({ hostPath: containerJsonPath, containerPath: '/workspace/agent/container.json', readonly: true });
+  }
+
+  // Composer-managed CLAUDE.md artifacts — nested RO mounts. These are
+  // regenerated from the shared base + fragments on every spawn; any
+  // agent-side writes would be clobbered, so enforce read-only. Only
+  // CLAUDE.local.md (per-group memory) remains RW via the group-dir mount.
+  // `.claude-shared.md` is a symlink whose target (`/app/CLAUDE.md`) is
+  // already RO-mounted, so writes through it fail regardless — no need for
+  // a nested mount there.
+  const composedClaudeMd = path.join(groupDir, 'CLAUDE.md');
+  if (fs.existsSync(composedClaudeMd)) {
+    mounts.push({ hostPath: composedClaudeMd, containerPath: '/workspace/agent/CLAUDE.md', readonly: true });
+  }
   const fragmentsDir = path.join(groupDir, '.claude-fragments');
   if (fs.existsSync(fragmentsDir)) {
     mounts.push({ hostPath: fragmentsDir, containerPath: '/workspace/agent/.claude-fragments', readonly: true });
@@ -293,8 +299,12 @@ function buildMounts(
     mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: true });
   }
 
-  // Shared CLAUDE.md content is folded into the composed group CLAUDE.md.
-  // Do not file-mount /app/CLAUDE.md: Apple Container rejects file sources.
+  // Shared CLAUDE.md — read-only, imported by the composed entry point via
+  // the `.claude-shared.md` symlink inside the group dir.
+  const sharedClaudeMd = path.join(process.cwd(), 'container', 'CLAUDE.md');
+  if (fs.existsSync(sharedClaudeMd)) {
+    mounts.push({ hostPath: sharedClaudeMd, containerPath: '/app/CLAUDE.md', readonly: true });
+  }
 
   // Per-group .claude-shared at /home/node/.claude (Claude state, settings,
   // skill symlinks)
@@ -395,7 +405,7 @@ async function buildContainerArgs(
   providerContribution: ProviderContainerContribution,
   agentIdentifier?: string,
 ): Promise<string[]> {
-  const args: string[] = ['run', '--rm', '--name', containerName];
+  const args: string[] = ['run', '--rm', '--name', containerName, '--label', CONTAINER_INSTALL_LABEL];
 
   // Environment — only vars read by code we don't own.
   // Everything NanoClaw-specific is in container.json (read by runner at startup).
@@ -416,7 +426,7 @@ async function buildContainerArgs(
   if (agentIdentifier) {
     await onecli.ensureAgent({ name: agentGroup.name, identifier: agentIdentifier });
   }
-  const onecliApplied = await applyOneCliContainerConfig(args, agentIdentifier);
+  const onecliApplied = await onecli.applyContainerConfig(args, { addHostMapping: false, agent: agentIdentifier });
   if (!onecliApplied) {
     throw new Error('OneCLI gateway not applied — refusing to spawn container without credentials');
   }
@@ -452,40 +462,6 @@ async function buildContainerArgs(
   args.push('-c', 'exec bun run /app/src/index.ts');
 
   return args;
-}
-
-async function applyOneCliContainerConfig(args: string[], agentIdentifier?: string): Promise<boolean> {
-  let onecliConfig: Awaited<ReturnType<typeof onecli.getContainerConfig>>;
-  try {
-    onecliConfig = await onecli.getContainerConfig(agentIdentifier);
-  } catch {
-    return false;
-  }
-
-  const caDir = path.join(DATA_DIR, 'onecli-ca', agentIdentifier || 'default');
-  fs.mkdirSync(caDir, { recursive: true, mode: 0o700 });
-  const caHostPath = path.join(caDir, 'onecli-gateway-ca.pem');
-  fs.writeFileSync(caHostPath, onecliConfig.caCertificate, { mode: 0o600 });
-
-  const caContainerPath = '/onecli/onecli-gateway-ca.pem';
-  for (const [key, rawValue] of Object.entries(onecliConfig.env)) {
-    let value = rawValue.replaceAll('host.docker.internal', CONTAINER_HOST_GATEWAY);
-    if (
-      key === 'NODE_EXTRA_CA_CERTS' ||
-      key === 'SSL_CERT_FILE' ||
-      key === 'DENO_CERT' ||
-      value === onecliConfig.caCertificateContainerPath
-    ) {
-      value = caContainerPath;
-    }
-    args.push('-e', `${key}=${value}`);
-  }
-  args.push('-e', `NODE_EXTRA_CA_CERTS=${caContainerPath}`);
-  args.push('-e', `SSL_CERT_FILE=${caContainerPath}`);
-  args.push('-e', `DENO_CERT=${caContainerPath}`);
-  args.push(...readonlyMountArgs(caDir, '/onecli'));
-
-  return true;
 }
 
 /** Build a per-agent-group Docker image with custom packages. */
