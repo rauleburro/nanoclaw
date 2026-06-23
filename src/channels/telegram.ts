@@ -7,7 +7,14 @@ import { createTelegramAdapter } from '@chat-adapter/telegram';
 
 import { readEnvFile } from '../env.js';
 import { log } from '../log.js';
-import { createMessagingGroup, getMessagingGroupByPlatform, updateMessagingGroup } from '../db/messaging-groups.js';
+import { getAgentGroupByFolder } from '../db/agent-groups.js';
+import {
+  createMessagingGroup,
+  createMessagingGroupAgent,
+  getMessagingGroupAgentByPair,
+  getMessagingGroupByPlatform,
+  updateMessagingGroup,
+} from '../db/messaging-groups.js';
 import { grantRole, hasAnyOwner } from '../modules/permissions/db/user-roles.js';
 import { upsertUser } from '../modules/permissions/db/users.js';
 import { createChatSdkBridge, type ReplyContext } from './chat-sdk-bridge.js';
@@ -79,6 +86,10 @@ function readInboundFields(message: InboundMessage): InboundFields {
   return { text: c.text ?? '', authorUserId: c.author?.userId ?? null };
 }
 
+function generateId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * Build an onInbound interceptor that consumes pairing codes before they
  * reach the router. On match: records the chat + its paired user, promotes
@@ -111,6 +122,7 @@ async function sendPairingConfirmation(token: string, platformId: string): Promi
 }
 
 function createPairingInterceptor(
+  channelType: string,
   botUsernamePromise: Promise<string | null>,
   hostOnInbound: ChannelSetup['onInbound'],
   token: string,
@@ -142,21 +154,23 @@ function createPairingInterceptor(
       // code-bearing message never reaches an agent. Privilege is now a
       // property of the paired user, not the chat: upsert the user, and if
       // this instance has no owner yet, promote them to owner.
-      const existing = getMessagingGroupByPlatform('telegram', platformId);
-      if (existing) {
-        updateMessagingGroup(existing.id, {
+      let messagingGroup = getMessagingGroupByPlatform(channelType, platformId);
+      if (messagingGroup) {
+        updateMessagingGroup(messagingGroup.id, {
           is_group: consumed.consumed!.isGroup ? 1 : 0,
         });
       } else {
+        const id = generateId('mg');
         createMessagingGroup({
-          id: `mg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          channel_type: 'telegram',
+          id,
+          channel_type: channelType,
           platform_id: platformId,
           name: consumed.consumed!.name,
           is_group: consumed.consumed!.isGroup ? 1 : 0,
           unknown_sender_policy: 'strict',
           created_at: new Date().toISOString(),
         });
+        messagingGroup = getMessagingGroupByPlatform(channelType, platformId);
       }
 
       const pairedUserId = `telegram:${consumed.consumed!.adminUserId}`;
@@ -180,11 +194,42 @@ function createPairingInterceptor(
       }
 
       log.info('Telegram pairing accepted — chat registered', {
+        channelType,
         platformId,
         pairedUser: pairedUserId,
         promotedToOwner,
         intent: consumed.intent,
       });
+
+      if (messagingGroup && consumed.intent !== 'main' && consumed.intent.kind === 'wire-to') {
+        const agentGroup = getAgentGroupByFolder(consumed.intent.folder);
+        if (!agentGroup) {
+          log.warn('Telegram pairing wire-to target not found', {
+            channelType,
+            platformId,
+            folder: consumed.intent.folder,
+          });
+        } else if (!getMessagingGroupAgentByPair(messagingGroup.id, agentGroup.id)) {
+          createMessagingGroupAgent({
+            id: generateId('mga'),
+            messaging_group_id: messagingGroup.id,
+            agent_group_id: agentGroup.id,
+            engage_mode: messagingGroup.is_group === 0 ? 'pattern' : 'mention',
+            engage_pattern: messagingGroup.is_group === 0 ? '.' : null,
+            sender_scope: 'all',
+            ignored_message_policy: 'drop',
+            session_mode: 'shared',
+            priority: 0,
+            created_at: new Date().toISOString(),
+          });
+          log.info('Telegram pairing wired chat to agent group', {
+            channelType,
+            platformId,
+            folder: consumed.intent.folder,
+            agentGroupId: agentGroup.id,
+          });
+        }
+      }
 
       await sendPairingConfirmation(token, platformId);
     } catch (err) {
@@ -195,51 +240,61 @@ function createPairingInterceptor(
   };
 }
 
-registerChannelAdapter('telegram', {
-  factory: () => {
-    const env = readEnvFile(['TELEGRAM_BOT_TOKEN']);
-    if (!env.TELEGRAM_BOT_TOKEN) return null;
-    const token = env.TELEGRAM_BOT_TOKEN;
-    const telegramAdapter = createTelegramAdapter({
-      botToken: token,
-      mode: 'polling',
-    });
-    const bridge = createChatSdkBridge({
-      adapter: telegramAdapter,
-      concurrency: 'concurrent',
-      extractReplyContext,
-      supportsThreads: false,
-      transformOutboundText: sanitizeTelegramLegacyMarkdown,
-      maxTextLength: 4000,
-    });
+function createTelegramRegistration(channelType: string, tokenEnvName: string) {
+  return {
+    factory: () => {
+      const env = readEnvFile([tokenEnvName]);
+      const token = env[tokenEnvName];
+      if (!token) return null;
+      const telegramAdapter = createTelegramAdapter({
+        botToken: token,
+        mode: 'polling',
+      });
+      const bridge = createChatSdkBridge({
+        adapter: telegramAdapter,
+        concurrency: 'concurrent',
+        extractReplyContext,
+        supportsThreads: false,
+        transformOutboundText: sanitizeTelegramLegacyMarkdown,
+        maxTextLength: 4000,
+      });
 
-    const botUsernamePromise = fetchBotUsername(token);
+      const botUsernamePromise = fetchBotUsername(token);
 
-    const wrapped: ChannelAdapter = {
-      ...bridge,
-      resolveChannelName: async (platformId: string) => {
-        const chatId = platformId.split(':').slice(1).join(':');
-        if (!chatId) return null;
-        try {
-          const res = await fetch(`https://api.telegram.org/bot${token}/getChat`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId }),
-          });
-          const data = (await res.json()) as { ok?: boolean; result?: { title?: string } };
-          return data.ok ? (data.result?.title ?? null) : null;
-        } catch {
-          return null;
-        }
-      },
-      async setup(hostConfig: ChannelSetup) {
-        const intercepted: ChannelSetup = {
-          ...hostConfig,
-          onInbound: createPairingInterceptor(botUsernamePromise, hostConfig.onInbound, token),
-        };
-        return withRetry(() => bridge.setup(intercepted), 'bridge.setup');
-      },
-    };
-    return wrapped;
-  },
-});
+      const wrapped: ChannelAdapter = {
+        ...bridge,
+        name: channelType,
+        channelType,
+        resolveChannelName: async (platformId: string) => {
+          const chatId = platformId.split(':').slice(1).join(':');
+          if (!chatId) return null;
+          try {
+            const res = await fetch(`https://api.telegram.org/bot${token}/getChat`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ chat_id: chatId }),
+            });
+            const data = (await res.json()) as { ok?: boolean; result?: { title?: string } };
+            return data.ok ? (data.result?.title ?? null) : null;
+          } catch {
+            return null;
+          }
+        },
+        async setup(hostConfig: ChannelSetup) {
+          const intercepted: ChannelSetup = {
+            ...hostConfig,
+            onInbound: createPairingInterceptor(channelType, botUsernamePromise, hostConfig.onInbound, token),
+          };
+          return withRetry(() => bridge.setup(intercepted), 'bridge.setup');
+        },
+      };
+      return wrapped;
+    },
+  };
+}
+
+registerChannelAdapter('telegram', createTelegramRegistration('telegram', 'TELEGRAM_BOT_TOKEN'));
+registerChannelAdapter(
+  'telegram-terreno',
+  createTelegramRegistration('telegram-terreno', 'TELEGRAM_TERRENO_BOT_TOKEN'),
+);
